@@ -8,9 +8,7 @@
 
 ### Directory Structure
 
-- 支援不限層級的目錄結構
-- 每個檔案皆屬於一個目錄
-- 支援 Word、Image、Text 三種檔案類型
+- 支援不限層級的目錄結構，每個檔案皆屬於一個目錄，並且支援 Word、Image、Text 三種檔案類型
 - 顯示完整目錄結構與檔案資訊
 
 ### Calculate Total Size
@@ -49,22 +47,19 @@ Visiting: 系統架構圖.png
 可將目前完整目錄結構轉換為 XML：
 
 ```xml
-<根目錄_Root>
+<根目錄>
   <專案文件_Project_Docs>
-    <需求規格書_docx>頁數: 15, 大小: 500KB</需求規格書_docx>
-    <系統架構圖_png>解析度: 1920x1080, 大小: 2MB</系統架構圖_png>
+    <需求規格書_docx>頁數: 15, 大小： 500KB</需求規格書_docx>
+    <系統架構圖_png>解析度: 1920x1080, 大小： 2MB</系統架構圖_png>
   </專案文件_Project_Docs>
-
   <個人筆記_Personal_Notes>
-    <待辦清單_txt>編碼: UTF-8, 大小: 1KB</待辦清單_txt>
-
     <Archive_2025>
-      <舊會議記錄_docx>頁數: 5, 大小: 200KB</舊會議記錄_docx>
+      <舊會議記錄_docx>頁數: 5, 大小： 200KB</舊會議記錄_docx>
     </Archive_2025>
+    <待辦清單_txt>編碼: UTF-8, 大小： 1KB</待辦清單_txt>
   </個人筆記_Personal_Notes>
-
-  <README_txt>編碼: ASCII, 大小: 500B</README_txt>
-</根目錄_Root>
+  <README_txt>編碼: ASCII, 大小： 500B</README_txt>
+</根目錄>
 ```
 
 ### Sorting
@@ -76,6 +71,12 @@ Web UI 額外實作排序功能，可依：
 - 副檔名
 
 進行升冪或降冪排序。
+
+## System Preview
+
+<p align="center">
+  <img src="docs/images/system-ui.png" width="900" alt="Cloud File System">
+</p>
 
 ---
 
