@@ -1,0 +1,175 @@
+<div class="app-shell">
+  <header class="toolbar">
+    <div class="toolbar-group">
+      <span class="toolbar-title">
+        <i class="bi bi-arrow-down-up"></i>
+      </span>
+
+      <button class="toolbar-button" [class.active]="sortBy() === 'name'" (click)="changeSort('name')">
+        <span> 名稱 </span>
+
+        @if (sortBy() === 'name') {
+           <i class="bi"
+                [class.bi-sort-alpha-down]="sortAscending()"
+                [class.bi-sort-alpha-up]="!sortAscending()"></i>
+        }
+      </button>
+
+      <button class="toolbar-button" [class.active]="sortBy() === 'size'" (click)="changeSort('size')">
+        <span> 大小 </span>
+
+        @if (sortBy() === 'size') {
+            <i class="bi"
+                [class.bi-sort-down]="sortAscending()"
+                [class.bi-sort-up]="!sortAscending()"></i>
+        }
+      </button>
+
+      <button class="toolbar-button" [class.active]="sortBy() === 'extension'" (click)="changeSort('extension')">
+        <span> 副檔名 </span>
+
+        @if (sortBy() === 'extension') {
+            <i class="bi"
+                [class.bi-sort-down]="sortAscending()"
+                [class.bi-sort-up]="!sortAscending()"></i>
+        }
+      </button>
+    </div>
+  </header>
+
+
+  <!-- =====================================================
+       Main Workspace
+       ===================================================== -->
+  <main class="workspace">
+    <section class="panel tree-panel">
+      <div class="panel-title">
+        <div class="panel-title-left">
+          <i class="bi bi-folder2-open title-icon folder-icon"></i>
+          <span> 檔案階層 (Composite) </span>
+        </div>
+
+        <span class="item-count"> {{ fileSystemItem().length }} items </span>
+      </div>
+
+
+      <div class="tree-container">
+        @for (item of fileSystemItem(); track $index) {
+          <div class="tree-row" [class.directory-row]="item.nodeType === 1" [class.file-row]="item.nodeType === 2"
+            [class.selected]="item.nodeType === 1 && selectedDirectoryId() === item.id"
+            [style.padding-left.px]="24 + item.level * 36" (click)="selectDirectory(item)">
+
+            <span class="tree-icon">
+              <i [class]="item.icon"></i>
+            </span>
+
+            <span class="tree-name">{{ item.name }}</span>
+            <span class="tree-detail">{{ item.detail }}</span>
+          </div>
+        }
+      </div>
+    </section>
+
+
+    <div class="right-column">
+      <section class="panel operation-panel">
+        <div class="panel-title">
+          <div class="panel-title-left">
+            <i class="bi bi-tools title-icon operation-icon"></i>
+            <span> 訪問者操作 (Visitor) </span>
+          </div>
+        </div>
+
+
+        <div class="operation-content">
+          <button class="action-card calculate-card" [disabled]="selectedDirectoryId() === null"
+            (click)="calculateTotalSize()">
+            <div class="action-title"> 計算大小 </div>
+            <i class="bi bi-calculator action-icon"></i>
+          </button>
+
+          @if (totalSize()) {
+            <div class="total-size-result">
+              <strong> 總大小 {{ totalSize() }} </strong>
+            </div>
+          }
+
+          <button class="action-card xml-card" (click)="exportXml()">
+            <div class="action-title"> XML 匯出 </div>
+            <i class="bi bi-file-earmark-arrow-down action-icon"></i>
+          </button>
+
+          <div class="search-area">
+            <div class="search-row">
+              <input type="text" class="search-input" [(ngModel)]="extension"
+                placeholder="輸入副檔名，例如 .docx">
+
+              <button class="search-button" [disabled]="selectedDirectoryId() === null || !extension.trim()"
+                (click)="searchByExtension()">
+                <i class="bi bi-search"></i> 搜尋
+              </button>
+            </div>
+          </div>
+
+
+          @if (searchResults().length > 0) {
+            <div class="search-results">
+
+              @for (
+                result of searchResults();
+                track $index
+              ) {
+                <div class="search-result-row">
+                  <span class="search-result-icon">
+                    <i class="bi bi-file-earmark"></i>
+                  </span>
+
+                  <span class="result-path">
+                    {{ result }}
+                  </span>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </section>
+
+
+      <section class="console-panel">
+        <div class="console-header">
+          <div class="console-title">
+            <i class="bi bi-terminal"></i>
+            <span> CONSOLE </span>
+          </div>
+
+          <span class="console-status">
+            @if (processLogs().length > 0) {
+              {{ processLogs().length }} logs
+            } @else {
+              Ready
+            }
+          </span>
+        </div>
+
+        <div class="console-content">
+          @if (processLogs().length > 0) {
+            @for (
+              log of processLogs();
+              track $index
+            ) {
+              <div class="console-line">
+                <span class="console-prefix"> &gt; </span>
+                <span class="console-text">{{ log }}</span>
+              </div>
+            }
+          } @else {
+            <div class="console-placeholder">
+              <span class="console-prefix"> &gt; </span>
+              <span> Waiting for operation... </span>
+            </div>
+          }
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
