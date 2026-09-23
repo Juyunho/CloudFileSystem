@@ -1,4 +1,5 @@
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddSingleton<CloudFileSystem.Handlers.FileSystemHandler>();
 
 // Add services to the container.
 

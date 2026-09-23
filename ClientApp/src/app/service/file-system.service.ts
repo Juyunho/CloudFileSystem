@@ -37,4 +37,21 @@ export class FileSystemService {
     serializeToXml(): Observable<string> {
         return this.http.get( `${this.apiUrl}/serializeToXml`, { responseType: 'text' });
     }
+
+    deleteNode(nodeType: number, id: number): Observable<void> {
+        return this.http.delete<void>(`${this.apiUrl}/deleteNode`, { params: { nodeType, id } });
+    }
+
+    setTags(nodeType: number, id: number, tags: string[]): Observable<void> {
+        return this.http.put<void>(`${this.apiUrl}/setTags`, tags, { params: { nodeType, id } });
+    }
+
+    pasteNode(sourceNodeType: number, sourceId: number, targetDirectoryId: number): Observable<FileSystemNode> {
+        return this.http.post<FileSystemNode>(`${this.apiUrl}/pasteNode`, {}, {
+            params: { sourceNodeType, sourceId, targetDirectoryId }
+        });
+    }
+
+    undo(): Observable<void> { return this.http.post<void>(`${this.apiUrl}/undo`, {}); }
+    redo(): Observable<void> { return this.http.post<void>(`${this.apiUrl}/redo`, {}); }
 }

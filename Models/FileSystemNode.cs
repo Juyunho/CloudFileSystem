@@ -4,6 +4,7 @@ namespace CloudFileSystem.Models
     {
         public int id { get; set; }
         public string name { get; set; } = string.Empty;
+        public DateTime? createdTime { get; set; }
         public NodeType nodeType { get; set; }
         public long? size { get; set; }
         public string? displaySize { get; set; }
@@ -12,6 +13,7 @@ namespace CloudFileSystem.Models
         public int? width { get; set; }
         public int? height { get; set; }
         public string? encoding { get; set; }
+        public List<string> tags { get; set; } = new();
         public List<FileSystemNode> children { get; set; } = new List<FileSystemNode>();
 
     }

@@ -1,175 +1,106 @@
-<div class="app-shell">
+<div class="reference-workspace">
   <header class="toolbar">
-    <div class="toolbar-group">
-      <span class="toolbar-title">
-        <i class="bi bi-arrow-down-up"></i>
-      </span>
-
-      <button class="toolbar-button" [class.active]="sortBy() === 'name'" (click)="changeSort('name')">
-        <span> 名稱 </span>
-
-        @if (sortBy() === 'name') {
-           <i class="bi"
-                [class.bi-sort-alpha-down]="sortAscending()"
-                [class.bi-sort-alpha-up]="!sortAscending()"></i>
-        }
-      </button>
-
-      <button class="toolbar-button" [class.active]="sortBy() === 'size'" (click)="changeSort('size')">
-        <span> 大小 </span>
-
-        @if (sortBy() === 'size') {
-            <i class="bi"
-                [class.bi-sort-down]="sortAscending()"
-                [class.bi-sort-up]="!sortAscending()"></i>
-        }
-      </button>
-
-      <button class="toolbar-button" [class.active]="sortBy() === 'extension'" (click)="changeSort('extension')">
-        <span> 副檔名 </span>
-
-        @if (sortBy() === 'extension') {
-            <i class="bi"
-                [class.bi-sort-down]="sortAscending()"
-                [class.bi-sort-up]="!sortAscending()"></i>
-        }
-      </button>
+    <div class="toolbar-group history-tools">
+      <button class="icon-button" aria-label="Undo" title="Undo" (click)="undo()" [disabled]="undoCount() === 0"><i class="bi bi-arrow-counterclockwise"></i></button>
+      <button class="icon-button" aria-label="Redo" title="Redo" (click)="redo()" [disabled]="redoCount() === 0"><i class="bi bi-arrow-clockwise"></i></button>
     </div>
+    <span class="toolbar-separator"></span>
+    <div class="toolbar-group edit-tools">
+      <button class="compact-button" (click)="copySelected()" [disabled]="!selectedItem() || (selectedItem()?.nodeType === 1 && selectedItem()?.id === fileSystemTree()?.id)"><i class="bi bi-files"></i> 複製</button>
+      <button class="compact-button" (click)="pasteClipboard()" [disabled]="!canPaste()"><i class="bi bi-clipboard"></i> 貼上</button>
+      <button class="compact-button delete-button" (click)="deleteSelected()" [disabled]="!selectedItem() || (selectedItem()?.nodeType === 1 && selectedItem()?.id === fileSystemTree()?.id)"><i class="bi bi-trash"></i> 刪除</button>
+    </div>
+    <span class="toolbar-separator"></span>
+    <div class="toolbar-group sort-tools" aria-label="Sorting controls">
+      <span class="list-icon"><i class="bi bi-list-ul"></i></span>
+      <button class="segment-button" [class.active]="sortBy() === 'name'" (click)="changeSort('name')">名稱 @if (sortBy() === 'name') { {{ sortAscending() ? '↑' : '↓' }} }</button>
+      <button class="segment-button" [class.active]="sortBy() === 'size'" (click)="changeSort('size')">大小 @if (sortBy() === 'size') { {{ sortAscending() ? '↑' : '↓' }} }</button>
+      <button class="segment-button" [class.active]="sortBy() === 'extension'" (click)="changeSort('extension')">副檔名 @if (sortBy() === 'extension') { {{ sortAscending() ? '↑' : '↓' }} }</button>
+    </div>
+    <span class="toolbar-separator"></span>
+    <div class="toolbar-group tag-tools">
+      <span class="tag-icon"><i class="bi bi-tag"></i></span>
+      @for (tag of ['Urgent', 'Work', 'Personal']; track tag) {
+        <button class="toolbar-tag" [class.urgent]="tag === 'Urgent'" [class.work]="tag === 'Work'" [class.personal]="tag === 'Personal'"
+          [class.active]="selectedItem()?.tags?.includes(tag)" [disabled]="!selectedItem()" (click)="toggleTag(tag)">
+          + {{ tag }} @if (tagCount(tag)) { <span class="tag-count">{{ tagCount(tag) }}</span> }
+        </button>
+      }
+    </div>
+    @if (clipboardItem(); as copied) { <span style="margin-left:auto;color:#64748b;font-size:10px" title="Copied node">Copied: {{ copied.name }}</span> }
   </header>
 
-
-  <!-- =====================================================
-       Main Workspace
-       ===================================================== -->
-  <main class="workspace">
-    <section class="panel tree-panel">
-      <div class="panel-title">
-        <div class="panel-title-left">
-          <i class="bi bi-folder2-open title-icon folder-icon"></i>
-          <span> 檔案階層 (Composite) </span>
-        </div>
-
-        <span class="item-count"> {{ fileSystemItem().length }} items </span>
-      </div>
-
-
-      <div class="tree-container">
-        @for (item of fileSystemItem(); track $index) {
-          <div class="tree-row" [class.directory-row]="item.nodeType === 1" [class.file-row]="item.nodeType === 2"
-            [class.selected]="item.nodeType === 1 && selectedDirectoryId() === item.id"
-            [style.padding-left.px]="24 + item.level * 36" (click)="selectDirectory(item)">
-
-            <span class="tree-icon">
-              <i [class]="item.icon"></i>
-            </span>
-
+  <section class="panel tree-panel">
+    <div class="panel-heading"><i class="bi bi-folder folder-heading-icon"></i><h1>檔案階層 (Composite)</h1></div>
+    <div class="tree-surface">
+      @for (item of fileSystemItem(); track item.nodeType + '-' + item.id) {
+        <div class="tree-line" [class.has-guide]="item.level > 0" [style.--level]="item.level">
+          <button type="button" class="tree-row" [class.directory-row]="item.nodeType === 1" [class.file-row]="item.nodeType === 2"
+            [class.selected]="selectedItem()?.nodeType === item.nodeType && selectedItem()?.id === item.id"
+            [class.search-match]="isSearchMatch(item)"
+            [style.padding-left.px]="18 + item.level * 34" (click)="selectDirectory(item)"
+            [attr.aria-label]="item.name + ' ' + item.detail">
+            <span class="tree-icon"><i [class]="item.icon"></i></span>
             <span class="tree-name">{{ item.name }}</span>
+            @if (item.alias) { <span class="tree-alias">({{ item.alias }})</span> }
             <span class="tree-detail">{{ item.detail }}</span>
-          </div>
+            <span class="tree-tags">
+              @for (tag of item.tags; track tag) {
+                <span role="button" tabindex="0" class="tag-badge" [class.tag-urgent]="tag === 'Urgent'" [class.tag-work]="tag === 'Work'" [class.tag-personal]="tag === 'Personal'"
+                  (click)="removeTagFromTree($event, item, tag)" [attr.aria-label]="'Remove ' + tag">{{ tag.toUpperCase() }} ×</span>
+              }
+            </span>
+          </button>
+        </div>
+      }
+    </div>
+  </section>
+
+  <div class="center-column">
+    <section class="panel visitor-panel">
+      <div class="panel-heading"><i class="bi bi-person visitor-icon"></i><h2>訪問者操作 (Visitor)</h2></div>
+      <div class="visitor-content">
+        @if (errorMessage()) { <p class="error-message" role="alert">{{ errorMessage() }}</p> }
+        <button class="visitor-action calculate-action" [disabled]="selectedDirectoryId() === null" (click)="calculateTotalSize()"><span>計算大小</span><i class="bi bi-calculator"></i></button>
+        @if (totalSize()) { <div class="compact-result"><strong>{{ selectedDirectoryName() }}</strong><span>{{ totalSize() }}</span></div> }
+        <button class="visitor-action xml-action" (click)="previewXml()"><span>XML 匯出</span><i class="bi bi-file-earmark-code"></i></button>
+        @if (xmlPreview()) {
+          <details class="xml-preview" open><summary>XML Preview <button type="button" (click)="downloadXml()">Download</button></summary><pre>{{ xmlPreview() }}</pre></details>
         }
+        <div class="search-row">
+          <div class="search-input-wrap">
+            <input type="text" class="search-input" [(ngModel)]="extension" placeholder="輸入副檔名，例如 .docx">
+            @if (extension || hasSearched()) { <button type="button" class="clear-search" aria-label="Clear search" title="Clear search" (click)="clearSearch()">×</button> }
+          </div>
+          <button class="search-button" [disabled]="selectedDirectoryId() === null || !extension.trim()" (click)="searchByExtension()">搜尋 <i class="bi bi-search"></i></button>
+        </div>
+        @if (hasSearched() && !searchResults().length) { <p class="empty-search">沒有符合的檔案</p> }
       </div>
     </section>
 
-
-    <div class="right-column">
-      <section class="panel operation-panel">
-        <div class="panel-title">
-          <div class="panel-title-left">
-            <i class="bi bi-tools title-icon operation-icon"></i>
-            <span> 訪問者操作 (Visitor) </span>
-          </div>
+    <section class="panel observer-panel">
+      <div class="panel-heading"><i class="bi bi-activity observer-icon"></i><h2>監控 (Observer)</h2><span class="live-badge">LIVE</span></div>
+      <div class="observer-content">
+        <div class="observer-card">
+          <span class="observer-label">目前節點</span>
+          <strong>{{ selectedItem()?.name || '尚未選取' }}</strong>
+          @if (selectedItem(); as item) { <small>{{ fileTypeName(item) }} · {{ item.displaySize || item.alias || 'Directory' }} @if (item.createdTime) { · Created Time: {{ item.createdTime | date:'yyyy/MM/dd HH:mm' }} }</small> }
         </div>
-
-
-        <div class="operation-content">
-          <button class="action-card calculate-card" [disabled]="selectedDirectoryId() === null"
-            (click)="calculateTotalSize()">
-            <div class="action-title"> 計算大小 </div>
-            <i class="bi bi-calculator action-icon"></i>
-          </button>
-
-          @if (totalSize()) {
-            <div class="total-size-result">
-              <strong> 總大小 {{ totalSize() }} </strong>
-            </div>
-          }
-
-          <button class="action-card xml-card" (click)="exportXml()">
-            <div class="action-title"> XML 匯出 </div>
-            <i class="bi bi-file-earmark-arrow-down action-icon"></i>
-          </button>
-
-          <div class="search-area">
-            <div class="search-row">
-              <input type="text" class="search-input" [(ngModel)]="extension"
-                placeholder="輸入副檔名，例如 .docx">
-
-              <button class="search-button" [disabled]="selectedDirectoryId() === null || !extension.trim()"
-                (click)="searchByExtension()">
-                <i class="bi bi-search"></i> 搜尋
-              </button>
-            </div>
-          </div>
-
-
-          @if (searchResults().length > 0) {
-            <div class="search-results">
-
-              @for (
-                result of searchResults();
-                track $index
-              ) {
-                <div class="search-result-row">
-                  <span class="search-result-icon">
-                    <i class="bi bi-file-earmark"></i>
-                  </span>
-
-                  <span class="result-path">
-                    {{ result }}
-                  </span>
-                </div>
-              }
-            </div>
-          }
+        <div class="progress-card">
+          <div class="progress-label"><span>掃描進度</span><strong>{{ progressPercent() }}%</strong></div>
+          <div class="progress-track"><span [style.width.%]="progressPercent()"></span></div>
+          <small>{{ processedCount() }} / {{ operationNodeCount() }} Nodes</small>
         </div>
-      </section>
+      </div>
+    </section>
+  </div>
 
-
-      <section class="console-panel">
-        <div class="console-header">
-          <div class="console-title">
-            <i class="bi bi-terminal"></i>
-            <span> CONSOLE </span>
-          </div>
-
-          <span class="console-status">
-            @if (processLogs().length > 0) {
-              {{ processLogs().length }} logs
-            } @else {
-              Ready
-            }
-          </span>
-        </div>
-
-        <div class="console-content">
-          @if (processLogs().length > 0) {
-            @for (
-              log of processLogs();
-              track $index
-            ) {
-              <div class="console-line">
-                <span class="console-prefix"> &gt; </span>
-                <span class="console-text">{{ log }}</span>
-              </div>
-            }
-          } @else {
-            <div class="console-placeholder">
-              <span class="console-prefix"> &gt; </span>
-              <span> Waiting for operation... </span>
-            </div>
-          }
-        </div>
-      </section>
+  <aside class="console-panel">
+    <div class="console-header"><span class="status-dot"></span><strong>CONSOLE</strong></div>
+    <div class="console-content">
+      @for (line of consoleLines(); track $index) {
+        <div class="console-line" [class.result-line]="line.startsWith('[Result]')" [class.history-line]="line.startsWith('[Undo]') || line.startsWith('[Redo]')">{{ line }}</div>
+      }
     </div>
-  </main>
+  </aside>
 </div>

@@ -8,6 +8,7 @@ namespace CloudFileSystem.Models
         public int id { get; set; }
         public int? parentId { get; set; }
         public string name { get; set; } = string.Empty;
+        public int displayOrder { get; set; }
         public DateTime createdTime { get; set; } = DateTime.Now;
         
     }
