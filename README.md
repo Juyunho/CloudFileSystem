@@ -1,405 +1,745 @@
 # Cloud File System
 
-Cloud File System is an ASP.NET Core and Angular interview assignment that models recursive directories, typed files, traversal operations, editing, tags, and undo/redo. This V2 refactor keeps the original behavior and UI while making the domain model, dependency flow, test strategy, and architecture decisions explicit and executable.
+A cloud file management system implemented with **ASP.NET Core / C#** and **Angular**.
+
+This project models a hierarchical file system containing directories and multiple file types, and supports recursive operations such as size calculation, extension search, XML serialization, copy/paste, tags, and Undo/Redo.
+
+Beyond functional requirements, the enhanced version focuses on **domain modeling, design patterns, dependency injection, automated testing, CI, UML/ER design, and AI-assisted engineering workflow**.
 
 ![Cloud File System UI](docs/images/system-ui.png)
 
-## Architecture at a Glance
+---
+
+## Project Overview
+
+The system manages three file types:
+
+- **Word** — page count
+- **Image** — width and height
+- **Text** — encoding
+
+All files share:
+
+- Name
+- Size
+- Creation time
+
+Directories may contain both files and other directories with unlimited nesting depth.
+
+### Core Features
+
+- Recursive directory tree
+- Recursive total-size calculation
+- File search by extension with full paths
+- XML serialization
+- Traversal logging
+- Sorting
+- Tags
+- Delete
+- Copy / Paste
+- Undo / Redo
+- Angular Web UI
+
+---
+
+# Architecture Overview
+
+The application follows a layered structure:
+
+```text
+Angular Client
+      ↓
+Controller
+      ↓
+Handler / Application Layer
+      ↓
+Manager
+      ↓
+DAO
+      ↓
+In-Memory Data Source
+```
 
 ```mermaid
 flowchart LR
-    UI[Angular workspace] --> API[FileSystemController]
-    API --> IH[IFileSystemHandler]
-    IH --> H[FileSystemHandler]
-    H --> CH[FileSystemCommandHistory]
-    H --> TF[FileSystemTreeFactory]
-    TF --> FM[IFileManager]
-    TF --> DM[IDirectoryManager]
-    FM --> FD[IFileDao]
-    DM --> DD[IDirectoryDao]
-    FD --> FDS[In-memory file data]
-    DD --> DDS[In-memory directory data]
-    H --> DTO[API DTO mapping]
+    UI["Angular Client"]
+    Controller["FileSystemController"]
+    Handler["IFileSystemHandler<br/>FileSystemHandler"]
+    Factory["FileSystemTreeFactory"]
+    Managers["File / Directory Managers"]
+    DAOs["File / Directory DAOs"]
+    Store["In-Memory Data"]
+
+    UI --> Controller
+    Controller --> Handler
+    Handler --> Factory
+    Factory --> Managers
+    Managers --> DAOs
+    DAOs --> Store
 ```
 
-ASP.NET Core dependency injection composes the controller, handler, manager, and DAO boundaries. The handler constructs the concrete `FileSystemTreeFactory` from its injected managers. The application handler owns one in-memory filesystem aggregate and serializes access with a lock. Runtime persistence remains in memory by design.
+ASP.NET Core Dependency Injection composes the Controller, Handler, Manager, and DAO boundaries.
 
-## Assignment Scope
+`FileSystemTreeFactory` is currently created by `FileSystemHandler` and reconstructs the typed domain tree from the data-access layer.
 
-The source assignment asks for:
+The runtime implementation intentionally remains **in-memory**. The DAO boundary keeps persistence concerns separated so that another persistence mechanism could be introduced later without changing the domain model.
 
-- Word, Image, and Text files with shared name, size, and creation time plus subtype metadata.
-- Unlimited nested directories, with every file contained by a directory.
-- The supplied sample hierarchy and readable details.
-- Recursive total-size calculation.
-- Extension search with full paths.
-- XML serialization and traversal logs.
-- UML and a proposed ER model.
-- Bonus sorting, delete or copy/paste, colored multiple tags, and undo/redo.
+---
 
-The UI makes each requirement directly demonstrable. Layout work is intentionally secondary to domain and architecture clarity.
+# Domain Model
 
-## What Was Enhanced
+The file-system hierarchy is modeled using the **Composite Pattern**.
 
-| Concern | Original implementation | V2 engineering refactor |
-| --- | --- | --- |
-| Runtime tree | One DTO-shaped node with enum checks and nullable subtype fields | Abstract Composite domain with directory and typed file subclasses |
-| API contract | Domain and transport concerns shared one structure | Explicit domain-to-DTO mapping preserves Angular compatibility |
-| Undo/Redo | Whole-tree snapshots inside the handler | Concrete commands retain only mutation-specific undo state |
-| Construction | Handler and managers created concrete dependencies | Constructor injection from controller through DAO boundaries |
-| Tests | Custom executable scenario runner | Discoverable xUnit unit and in-process HTTP integration tests |
-| Coverage | No standard collector | Coverlet collector through `dotnet test --collect` |
-| CI | Manual local verification | GitHub Actions for restore, build, tests, coverage artifact, and Angular build |
-| Decisions | README audit notes | Focused ADRs tied to implemented code |
-| Repository | ASP.NET template leftovers | Confirmed unused WeatherForecast template removed |
+`FileSystemNode` defines the common abstraction for both directories and files.
 
-## Key Design Decisions
-
-### Composite Domain Model
-
-**Decision.** `FileSystemNode` is the abstract component. `DirectoryNode` is the composite and owns child nodes. `FileNode` is the leaf base, with `WordFileNode`, `ImageFileNode`, and `TextFileNode` as concrete leaves.
-
-**Why.** Recursive containment and total size are inherent to the domain. Polymorphism prevents invalid combinations such as encoding on an image or page count on a text file. Parent links make full paths and containment rules explicit.
-
-**Trade-off.** The stable frontend contract still uses a flat DTO with discriminators, so `FileSystemHandler.ToDto` maps the typed domain at the API boundary.
-
-### Command Based Undo and Redo
-
-**Decision.** `IFileSystemCommand` defines `Execute` and `Undo`. `FileSystemCommandHistory` is the invoker and history coordinator.
-
-| Command | State retained for Undo |
-| --- | --- |
-| `DeleteNodeCommand` | Removed node, original parent, original index |
-| `PasteNodeCommand` | Pasted subtree and target directory |
-| `SetTagsCommand` | Old and new tag lists |
-
-Executing a command pushes it to undo history and clears redo history. Undo moves it to redo history; Redo executes the same command again. Copy remains frontend clipboard state and is not mutation history. Paste is the mutation.
-
-**Trade-off.** Command objects hold domain references and assume one in-memory aggregate. A database implementation would coordinate commands with transactions and persistence identity.
-
-### Dependency Injection
-
-The actual production chain is:
-
-```text
-FileSystemController
-  -> IFileSystemHandler
-  -> IFileManager / IDirectoryManager
-  -> IFileDao / IDirectoryDao
-  -> in-memory source data
-```
-
-`Program.cs` registers these dependencies. Controllers, handlers, and managers use constructor injection. Interfaces are limited to meaningful replaceable boundaries; domain entities and commands remain concrete.
-
-### DAO and Persistence Boundary
-
-Runtime storage stays in memory because the assignment evaluates modeling and recursive behavior, not database setup. DAO remains an accurate name for the current record-oriented data source. The proposed relational schema below describes an evolution path and is not implemented persistence.
-
-## Domain Model
+- `DirectoryNode` is the composite and may contain other `FileSystemNode` objects.
+- `FileNode` is the abstract leaf base class.
+- `WordFileNode`, `ImageFileNode`, and `TextFileNode` provide file-type-specific metadata.
 
 ```mermaid
 classDiagram
+    direction TB
+
     class FileSystemNode {
         <<abstract>>
-        +Id int
-        +Name string
-        +CreatedTime DateTime
-        +Parent DirectoryNode?
-        +Tags IReadOnlyList
-        +TotalSize long
+        +int Id
+        +string Name
+        +DateTime CreatedTime
+        +DirectoryNode? Parent
+        +IReadOnlyList Tags
+        +long TotalSize
         +ReplaceTags(tags)
-        +DeepCopy(nextDirectoryId, nextFileId) FileSystemNode
+        +DeepCopy(...) FileSystemNode
     }
+
     class DirectoryNode {
-        -children List
-        +Children IReadOnlyList
+        -List children
+        +IReadOnlyList Children
+        +long TotalSize
         +Add(node, index)
         +Remove(node) int
-        +TotalSize long
     }
+
     class FileNode {
         <<abstract>>
-        +Size long
-        +TotalSize long
+        +long Size
+        +long TotalSize
     }
-    class WordFileNode { +PageCount int }
-    class ImageFileNode { +Width int +Height int }
-    class TextFileNode { +Encoding string }
+
+    class WordFileNode {
+        +int PageCount
+    }
+
+    class ImageFileNode {
+        +int Width
+        +int Height
+    }
+
+    class TextFileNode {
+        +string Encoding
+    }
 
     FileSystemNode <|-- DirectoryNode
     FileSystemNode <|-- FileNode
+
     FileNode <|-- WordFileNode
     FileNode <|-- ImageFileNode
     FileNode <|-- TextFileNode
+
     DirectoryNode "0..1" *-- "0..*" FileSystemNode : children
 ```
 
-The runtime domain hierarchy lives under `Domain/`. Flat `DirectoryModel` and `FileModel` records represent source data read through DAOs. `FileSystemTreeFactory` validates and constructs the aggregate. API `Models/FileSystemNode.cs` is a transport DTO retained for client compatibility.
+This structure allows recursive behavior to operate naturally on the hierarchy without relying on a single model containing file-type discriminator fields and many nullable properties.
 
-## Command and History Model
+The domain also protects important tree invariants such as preventing self-cycles, ancestor cycles, duplicate children, and multiple-parent ownership.
+
+---
+
+# Design Patterns
+
+## Composite Pattern
+
+The recursive file-system hierarchy uses the **Composite Pattern**.
+
+```text
+FileSystemNode
+├── DirectoryNode
+│   └── 0..* FileSystemNode
+│
+└── FileNode
+    ├── WordFileNode
+    ├── ImageFileNode
+    └── TextFileNode
+```
+
+This allows directories and files to share the same base abstraction while `DirectoryNode` recursively contains other nodes.
+
+Typical recursive operations such as total-size calculation and traversal can therefore operate naturally on the domain hierarchy.
+
+---
+
+## Command Pattern — Undo / Redo
+
+Mutating operations that require Undo/Redo are modeled as commands.
 
 ```mermaid
 classDiagram
+    direction TB
+
+    class FileSystemHandler {
+        <<Invoker>>
+    }
+
+    class FileSystemCommandHistory {
+        <<History>>
+        +Execute(command)
+        +Undo()
+        +Redo()
+    }
+
     class IFileSystemCommand {
         <<interface>>
         +Execute()
         +Undo()
     }
-    class FileSystemCommandHistory {
-        -undo Stack
-        -redo Stack
-        +Execute(command)
-        +Undo() bool
-        +Redo() bool
-    }
+
     class DeleteNodeCommand
     class PasteNodeCommand
     class SetTagsCommand
-    class FileSystemHandler
-    class FileSystemNode
-    class DirectoryNode
+
+    FileSystemHandler --> FileSystemCommandHistory : executes through
+    FileSystemCommandHistory --> IFileSystemCommand : manages
 
     IFileSystemCommand <|.. DeleteNodeCommand
     IFileSystemCommand <|.. PasteNodeCommand
     IFileSystemCommand <|.. SetTagsCommand
-    FileSystemCommandHistory --> IFileSystemCommand
-    FileSystemHandler --> FileSystemCommandHistory
-    FileSystemHandler ..> DeleteNodeCommand : creates
-    FileSystemHandler ..> PasteNodeCommand : creates
-    FileSystemHandler ..> SetTagsCommand : creates
-    DeleteNodeCommand --> FileSystemNode : removes/restores
-    PasteNodeCommand --> DirectoryNode : target
-    PasteNodeCommand --> FileSystemNode : copied subtree
-    SetTagsCommand --> FileSystemNode : changes tags
 ```
 
-## Proposed Persistence Model
+`FileSystemHandler` creates concrete commands and executes them through `FileSystemCommandHistory`.
 
-The application currently has no database, migrations, or physical tables. This ERD is the proposed production schema using table-per-hierarchy for file subtypes.
+Each command encapsulates both its execution and rollback behavior:
+
+- `DeleteNodeCommand` — removes and restores a node
+- `PasteNodeCommand` — inserts and removes the copied subtree
+- `SetTagsCommand` — changes and restores tags
+
+This provides operation-specific Undo/Redo without storing a complete snapshot of the entire tree for every mutation.
+
+---
+
+## Layered Architecture
+
+Responsibilities are separated into:
+
+| Layer | Responsibility |
+|---|---|
+| Controller | HTTP/API boundary |
+| Handler | Application workflow and file-system operations |
+| Manager | Coordinates file/directory data access |
+| DAO | Isolates the persistence/data source |
+| Domain | File-system entities and domain behavior |
+
+The separation keeps HTTP concerns, application workflow, persistence, and domain behavior from being tightly coupled.
+
+---
+
+## Dependency Injection
+
+ASP.NET Core DI is used for the main application boundaries:
+
+```text
+FileSystemController
+        ↓
+IFileSystemHandler
+        ↓
+IFileManager / IDirectoryManager
+        ↓
+IFileDao / IDirectoryDao
+```
+
+This reduces direct construction of replaceable infrastructure dependencies and improves testability.
+
+`FileSystemTreeFactory` remains a concrete helper created by the Handler rather than a separately injected abstraction.
+
+---
+
+# Proposed Persistence Model / ER Design
+
+> The runtime implementation currently uses in-memory persistence.
+>
+> The following ER model represents a **proposed relational persistence design**, not an implemented database schema.
 
 ```mermaid
 erDiagram
-    DIRECTORY o|--o{ DIRECTORY : parent_of
-    DIRECTORY ||--o{ FILE : contains
-    DIRECTORY ||--o{ DIRECTORY_TAG : has
-    FILE ||--o{ FILE_TAG : has
-    TAG ||--o{ DIRECTORY_TAG : assigned
-    TAG ||--o{ FILE_TAG : assigned
-
     DIRECTORY {
-        bigint id PK
-        bigint parent_directory_id FK
-        varchar name
-        int display_order
-        timestamp created_at
+        int id PK
+        int parent_directory_id FK
+        string name
+        datetime created_at
     }
+
     FILE {
-        bigint id PK
-        bigint directory_id FK
-        varchar name
-        bigint size_bytes
-        timestamp created_at
-        varchar file_type
+        int id PK
+        int directory_id FK
+        string name
+        long size_bytes
+        datetime created_at
+        string file_type
         int page_count
         int width
         int height
-        varchar encoding
-        int display_order
+        string encoding
     }
+
     TAG {
-        bigint id PK
-        varchar name UK
-        varchar color
+        int id PK
+        string name
+        string color
     }
+
     FILE_TAG {
-        bigint file_id PK,FK
-        bigint tag_id PK,FK
+        int file_id PK, FK
+        int tag_id PK, FK
     }
+
     DIRECTORY_TAG {
-        bigint directory_id PK,FK
-        bigint tag_id PK,FK
+        int directory_id PK, FK
+        int tag_id PK, FK
     }
+
+    DIRECTORY o|--o{ DIRECTORY : contains
+    DIRECTORY ||--o{ FILE : contains
+
+    FILE ||--o{ FILE_TAG : has
+    TAG ||--o{ FILE_TAG : assigned
+
+    DIRECTORY ||--o{ DIRECTORY_TAG : has
+    TAG ||--o{ DIRECTORY_TAG : assigned
 ```
 
-### Schema constraints and indexes
+### File Inheritance Strategy
 
-- `DIRECTORY.parent_directory_id` is nullable only for the root and references `DIRECTORY.id`.
-- `FILE.directory_id`, names, sizes, timestamps, file type, tag names, and tag colors are `NOT NULL`.
-- Recommended sibling uniqueness: `UNIQUE(parent_directory_id, name)` on directories and `UNIQUE(directory_id, name)` on files.
-- `TAG.name` is unique. Junction tables use composite primary keys to prevent duplicate assignments.
-- Index `DIRECTORY(parent_directory_id)`, `FILE(directory_id)`, `FILE(file_type)`, and both reverse tag lookup columns.
-- Add `CHECK (size_bytes >= 0)` and positive-value checks for `page_count`, `width`, and `height` when those subtype fields are present.
-- Constrain `file_type` to the supported Word, Image, and Text discriminator values, with subtype checks requiring the matching metadata and rejecting unrelated subtype values.
-- Directory cycle prevention remains an application/domain invariant; the proposed self-referencing foreign key alone cannot reject an arbitrary multi-row cycle.
-- The selected deletion strategy is application-controlled recursive deletion inside a transaction. Foreign keys use `RESTRICT` for directory/file ownership and `CASCADE` only from nodes or tags to their junction rows. This preserves command/audit control and avoids an unnoticed database cascade deleting a large subtree.
+The proposed `FILE` table uses a **single-table / TPH-style strategy**.
 
-The single `FILE` table uses a `file_type` discriminator with nullable `page_count`, `width`, `height`, and `encoding`. This keeps common file queries simple for three compact subtypes. Detail tables become preferable if subtypes gain many fields, independent lifecycles, or stricter database-level subtype constraints.
+`file_type` acts as the discriminator:
 
-## AI Assisted Engineering Workflow
-
-```mermaid
-flowchart LR
-    R[Human requirements] --> A[Acceptance criteria]
-    A --> RA[Repository analysis]
-    RA --> G[Gap analysis]
-    G --> C[Architecture constraints]
-    C --> T[Test definition]
-    T --> I[Implementation]
-    I --> E[Test execution]
-    E --> F[Failure analysis and fix]
-    F --> V[Regression verification]
-    V --> H[Human review]
+```text
+Word
+Image
+Text
 ```
 
-### Human responsibilities
+Subtype-specific columns are stored in the same table:
 
-- Define assignment intent, acceptance criteria, protected behavior, and repository safety rules.
-- Decide architecture constraints and approve trade-offs.
-- Review the user experience and final engineering narrative.
-- Own submission, commits, deployment, and final acceptance.
+| File Type | Metadata |
+|---|---|
+| Word | `page_count` |
+| Image | `width`, `height` |
+| Text | `encoding` |
 
-### AI agent responsibilities
+This keeps the persistence model simple for the current domain.
 
-- Inspect the repository and trace dependencies before editing.
-- Compare code and documentation with the supplied specification.
-- Propose and implement bounded changes inside human constraints.
-- Add and execute tests, builds, coverage, and repository checks.
-- Diagnose failures, fix regressions, and synchronize diagrams and claims with code.
+If file subtypes became substantially more complex, separate subtype/detail tables could be considered.
 
-The agent does not redefine product requirements or claim unverified patterns. Repository state and executable evidence take precedence over prompt assumptions.
+### Integrity Rules
 
-## Testing Strategy
+The proposed persistence model should enforce:
 
-The original project was not developed entirely with strict TDD, and this repository does not make that claim.
+- `size_bytes >= 0`
+- Word files require a positive `page_count`
+- Image files require positive `width` and `height`
+- Text files require `encoding`
+- `file_type` is restricted to `Word`, `Image`, or `Text`
+- junction tables use composite primary keys
+- files must belong to a directory
 
-### Regression protection
+Directory-cycle prevention is treated as a **domain/application invariant**, since preventing arbitrary recursive cycles through relational constraints alone is not straightforward.
 
-Existing assignment behavior was protected with regression tests covering sample data, metadata, recursion, search paths, XML, tags, copy/paste, collisions, validation, and history. Angular tests continue to protect UI behavior and API calls.
+---
 
-### Red Green Refactor used in V2
+# Original vs Enhanced Implementation
 
-During the V2 refactoring session, selected architectural and behavioral changes followed Red-Green-Refactor where practical. This describes the working-session verification sequence; it does not imply that Git history contains separate RED commits.
+The enhanced version focuses on improving architectural clarity and testability while preserving the original behavior.
 
-1. **RED:** tests referenced absent `DirectoryNode`, typed leaves, `IFileSystemCommand`, and command history; compilation failed for those expected missing types.
-2. **GREEN:** minimal Composite nodes and Delete/Tags command behavior made the first four architecture tests pass.
-3. **REFACTOR:** the handler was moved onto the typed aggregate, Paste became a command, DI boundaries were wired, and the full regression and HTTP suites were rerun.
-4. A regression test then exposed a lost XML alias; the serializer mapping was restored and the suite rerun.
+| Concern | Original | Enhanced |
+|---|---|---|
+| File-system model | General node model with type discrimination | Typed Composite domain hierarchy |
+| File types | Type-specific nullable fields | Word/Image/Text subclasses |
+| Recursive structure | Tree assembled around generic nodes | `DirectoryNode` owns child nodes |
+| Undo / Redo | Snapshot/history-oriented | Command Pattern |
+| Dependencies | Direct construction in several paths | Constructor injection for main boundaries |
+| Backend tests | Custom/lightweight verification | Standard xUnit test project |
+| Integration tests | Limited | HTTP integration tests |
+| CI | None | GitHub Actions |
+| Architecture docs | Basic | UML, ER model, ADRs |
+| AI usage | Implementation assistance | Constraint-driven engineering workflow |
 
-### Test layers
+---
 
-| Layer | Location | Focus |
-| --- | --- | --- |
-| Domain unit | `Tests/Domain` | Composite ownership, polymorphic size, subtype safety |
-| Application unit | `Tests/Application` | Commands, history, sample behavior, traversal, mutations, validation |
-| HTTP integration | `Tests/Integration` | Real ASP.NET pipeline, payloads, status codes, state transitions |
-| Angular component | `ClientApp/src/app/app.spec.ts` | Tree UI, metadata, operations, sorting, search, XML, history |
-| Angular service | `ClientApp/src/app/service/file-system.service.spec.ts` | HTTP methods, URLs, parameters, bodies |
-| External API smoke | `Tests/integration_test.py` | Separate API process and end-to-end HTTP sequence |
+# AI-Assisted Engineering Workflow
 
-## Requirement Traceability
+AI was used as an **engineering agent**, not as an autonomous replacement for architecture decisions.
 
-| Assignment requirement | Implementation | Automated evidence |
-| --- | --- | --- |
-| Sample hierarchy | `DirectoryDao`, `FileDao`, `FileSystemTreeFactory` | `Builds_required_sample_tree_and_type_metadata`; Angular rendering |
-| Word/Image/Text metadata | Typed domain leaves and `ToDto` | Domain subtype test; handler metadata test; Angular metadata assertions |
-| Recursive directories | `DirectoryNode.Children`, parent links | Composite ownership test; sample and deep-copy tests |
-| Total size | `DirectoryNode.TotalSize` | Theory for Root, Project Docs, Personal Notes; HTTP integration |
-| Extension normalization | `searchByExtension` | `docx` and `.DOCX` theory |
-| Full paths and scope | Parent relationship and `Path()` | Full-path and subtree-scope tests; HTTP integration |
-| XML serialization | `FileSystemHandler.ToXml` | XML hierarchy/metadata test; HTTP and Angular preview tests |
-| Traverse log | `Visit` with parent path | Size/search log count and prefix assertions |
-| Sorting | Angular `changeSort` / `sortTree` | Angular ASC/DESC tests for name, size, extension |
-| Delete | `DeleteNodeCommand` | Command position test; handler and HTTP delete tests |
-| Multiple tags | `SetTagsCommand` | Tag undo/redo test; Angular badges/history tests |
-| Copy file | Polymorphic `DeepCopy`, Paste command | Metadata/tags/new identity test; HTTP and Angular tests |
-| Copy directory | `DirectoryNode.DeepCopy` | Recursive identity/hierarchy/undo/redo test |
-| Paste validation | Ancestry check and root guard | Root/self/descendant theory; HTTP bad-request test |
-| Undo/Redo | `FileSystemCommandHistory` | Command and handler tests; HTTP and Angular state tests |
+The workflow followed:
 
-## Coverage
+```text
+Requirements
+    ↓
+Repository Analysis
+    ↓
+Gap Analysis
+    ↓
+Human-defined Architecture Constraints
+    ↓
+Implementation / Refactoring
+    ↓
+Automated Tests
+    ↓
+Failure Analysis
+    ↓
+Targeted Fix
+    ↓
+Regression Verification
+    ↓
+Documentation Synchronization
+    ↓
+Final Review
+```
 
-Backend coverage uses Coverlet's standard collector:
+## Responsibility Boundary
 
-```sh
+### Human
+
+Responsible for:
+
+- Requirements and acceptance criteria
+- Architecture constraints
+- Deciding which patterns were appropriate
+- Preventing unnecessary over-engineering
+- Reviewing AI-proposed changes
+- Determining submission scope
+- Final design decisions
+
+### AI Agent
+
+Used for:
+
+- Repository analysis
+- Identifying architecture/test gaps
+- Implementing changes within defined constraints
+- Generating test cases
+- Running verification
+- Analyzing failures
+- Applying targeted fixes
+- Synchronizing UML/documentation with implementation
+- Final consistency review
+
+AI-generated changes were not treated as correct by default.
+
+Changes were verified through:
+
+```text
+Implementation
+→ Automated Test
+→ Failure Analysis
+→ Fix
+→ Regression Test
+→ Build
+→ Documentation Review
+```
+
+---
+
+# Testing Strategy
+
+The project uses **xUnit** for backend testing.
+
+Tests are organized around:
+
+```text
+Tests/
+├── Domain/
+├── Application/
+├── Integration/
+└── TestSupport/
+```
+
+The test strategy distinguishes between two stages.
+
+### Existing Behavior
+
+Existing functionality was first protected with **regression tests** before architectural refactoring.
+
+### V2 Refactoring
+
+During the V2 working session, selected architectural and invariant changes followed a practical:
+
+```text
+RED
+ ↓
+GREEN
+ ↓
+REFACTOR
+```
+
+workflow.
+
+The project does **not** claim that the original implementation was historically developed using strict TDD.
+
+Examples of behavior covered by tests include:
+
+- Recursive tree construction
+- Word/Image/Text metadata
+- Recursive total-size calculation
+- Extension search
+- Full paths
+- XML serialization
+- Traversal
+- Delete
+- Tags
+- Copy/Paste
+- Deep copy
+- Parent relationships
+- ID uniqueness
+- Invalid Paste targets
+- Undo/Redo
+- Directory ownership invariants
+- Cycle prevention
+- Command-history failure consistency
+- HTTP error mapping
+
+---
+
+# Example Red-Green-Refactor Cycle
+
+During the targeted V2 hardening pass, new tests exposed several previously unhandled cases.
+
+Examples included:
+
+```text
+Directory self-cycle
+        ↓ RED
+Domain invariant added
+        ↓ GREEN
+Regression suite
+        ↓ PASS
+```
+
+and:
+
+```text
+Undo failure loses history entry
+        ↓ RED
+History transition corrected
+        ↓ GREEN
+Regression suite
+        ↓ PASS
+```
+
+The same approach identified an empty-file-tree Paste issue and missing-directory HTTP error mapping.
+
+---
+
+# Verification
+
+Final backend test result:
+
+```text
+41 passed
+0 failed
+0 skipped
+```
+
+Frontend:
+
+```text
+10 passed
+```
+
+Build verification:
+
+```text
+Backend Release Build    PASS
+Frontend Production Build PASS
+HTTP Integration          PASS
+git diff --check          PASS
+```
+
+Current reproducible backend coverage:
+
+```text
+Line coverage:   54.81%
+Branch coverage: 37.93%
+```
+
+Coverage is treated as a **verification signal rather than a target**. Tests prioritize domain invariants, recursive behavior, command history, copy/paste, validation, and HTTP integration instead of adding trivial tests solely to increase the percentage.
+
+---
+
+# Requirement → Test Traceability
+
+| Requirement | Implementation | Verification |
+|---|---|---|
+| Recursive directories | `DirectoryNode` Composite | Domain tests |
+| Word metadata | `WordFileNode` | Domain tests |
+| Image metadata | `ImageFileNode` | Domain tests |
+| Text metadata | `TextFileNode` | Domain tests |
+| Recursive size | `TotalSize` | Domain/Application tests |
+| Extension search | Handler traversal/search | Application tests |
+| Full path | Parent hierarchy | Application tests |
+| XML serialization | Recursive serialization | Application/Integration tests |
+| Traversal logging | Recursive traversal | Application tests |
+| Sorting | Application logic | Regression tests |
+| Delete | `DeleteNodeCommand` | Command tests |
+| Tags | `SetTagsCommand` | Command tests |
+| Copy/Paste | Deep copy + `PasteNodeCommand` | Application/Command tests |
+| Undo/Redo | `FileSystemCommandHistory` | Command tests |
+| HTTP API | Controller/Handler | Integration tests |
+
+---
+
+# CI
+
+GitHub Actions runs verification on:
+
+```text
+push
+pull_request
+```
+
+The CI pipeline verifies:
+
+### Backend
+
+```text
+Restore
+→ Build
+→ xUnit Tests
+→ Coverage
+```
+
+### Frontend
+
+```text
+npm ci
+→ Angular Tests
+→ Production Build
+```
+
+This ensures the repository can be verified in a clean environment rather than relying only on the developer's local machine.
+
+---
+
+# How to Run
+
+## Backend
+
+From the repository root:
+
+```bash
+dotnet restore
+dotnet run
+```
+
+## Backend Tests
+
+```bash
+dotnet test Tests/CloudFileSystem.Tests.csproj
+```
+
+## Backend Coverage
+
+```bash
 dotnet test Tests/CloudFileSystem.Tests.csproj --collect:"XPlat Code Coverage" --results-directory TestResults
 ```
 
-CI uploads the generated Cobertura XML. Coverage is a signal for untested risk, not a substitute for meaningful assertions. Final measured metrics are recorded in the verification section only after generation from the final tree.
+## Frontend
 
-## Continuous Integration
-
-`.github/workflows/ci.yml` runs on pushes and pull requests.
-
-- Backend: restore, Release build, xUnit tests, and Coverlet collection.
-- Frontend: deterministic `npm ci`, non-watch Angular tests, and production build.
-- The workflow uses .NET 10 and Node 22, matching the repository's target framework and Angular 22 requirements.
-
-## Architecture Decision Records
-
-- [ADR 001 Domain Composite Model](docs/adr/001-domain-composite-model.md)
-- [ADR 002 Command Based Undo and Redo](docs/adr/002-command-based-undo-redo.md)
-- [ADR 003 In Memory Persistence Boundary](docs/adr/003-in-memory-persistence-boundary.md)
-- [ADR 004 AI Agent Development Workflow](docs/adr/004-ai-agent-development-workflow.md)
-
-## Trade-offs and Future Evolution
-
-- Persist the aggregate through the existing DAO boundary when durability is required.
-- Add optimistic concurrency and transactional command execution for multiple writers.
-- Store binary content in object storage while retaining metadata in the relational model.
-- Add authentication, authorization, ownership, and audit records before multi-user use.
-- Use durable command/event records only if cross-session Undo/Redo becomes a requirement.
-- Split read models from mutation models if tree size or query volume outgrows the current aggregate.
-
-## How to Run
-
-Prerequisites: .NET 10 SDK, Node.js 22 or another Angular 22 supported version, and npm.
-
-```sh
-# API from repository root
-dotnet run --project CloudFileSystem.csproj --launch-profile http
-
-# Frontend from another terminal
+```bash
 cd ClientApp
 npm ci
 npm start
 ```
 
-Open `http://localhost:4200`. The frontend calls the API at `http://localhost:5182`.
+## Frontend Tests
 
-### Verification commands
-
-```sh
-dotnet restore Tests/CloudFileSystem.Tests.csproj
-dotnet build CloudFileSystem.csproj --no-restore
-dotnet test Tests/CloudFileSystem.Tests.csproj --no-restore
-python3 Tests/integration_test.py
-
+```bash
 cd ClientApp
-npm ci
 npm test -- --watch=false
+```
+
+## Frontend Production Build
+
+```bash
+cd ClientApp
 npm run build
 ```
 
-## Verification
+---
 
-This table is updated from commands executed against the final working tree.
+# Architecture Decisions
 
-| Gate | Result |
-| --- | --- |
-| Backend xUnit | 41 passed, 0 failed, 0 skipped |
-| In-process HTTP integration | Included in the 41 xUnit tests |
-| Separate-process HTTP smoke | PASS |
-| Backend Release build | PASS, 0 warnings, 0 errors |
-| Frontend tests | 10 passed in 2 files |
-| Frontend production build | PASS, 396.41 kB initial bundle |
-| Backend coverage | 54.81% line, 37.93% branch |
-| Diff and conflict-marker checks | PASS |
+Detailed architecture decisions are documented under:
 
-Expected fixed-sample values:
+```text
+docs/adr/
+├── 001-domain-composite-model.md
+├── 002-command-based-undo-redo.md
+├── 003-in-memory-persistence-boundary.md
+└── 004-ai-agent-development-workflow.md
+```
 
-- Root total: `2,815,476 B`
-- Project Docs total: `2,609,152 B`
-- Personal Notes total: `205,824 B`
-- Root traversal: 9 nodes
-- Root `.docx` search: 2 full paths
-- XML root: `<根目錄_Root>`
+The ADRs document the context, chosen design, alternatives considered, consequences, and trade-offs behind the main architectural decisions.
+
+---
+
+# Current Limitations
+
+The project intentionally remains scoped to the assignment.
+
+Current limitations include:
+
+- Runtime persistence is in-memory.
+- The file-system aggregate and Undo/Redo history are shared singleton state.
+- Multi-user isolation and authentication are not implemented.
+- Command execution is not backed by database transactions.
+- The API DTO retains `nodeType` / `fileType` discriminators for compatibility with the Angular client.
+- The ER model represents a proposed persistence design rather than an implemented database.
+
+These are deliberate scope boundaries rather than hidden implementation claims.
+
+---
+
+# Summary
+
+The enhanced implementation focuses on keeping one consistent engineering story:
+
+```text
+Requirements
+    ↓
+Domain Model
+    ↓
+Architecture Decisions
+    ↓
+Design Patterns
+    ↓
+Implementation
+    ↓
+Tests
+    ↓
+AI-Assisted Verification
+    ↓
+CI
+    ↓
+Documentation
+```
+
+The two primary design patterns used are:
+
+**Composite Pattern**  
+for the recursive file-system domain model.
+
+**Command Pattern**  
+for mutation-specific Undo/Redo behavior.
+
+The overall goal is not to maximize the number of abstractions or patterns, but to keep the implementation, UML, ER design, tests, and documentation consistent with the actual problem being solved.
