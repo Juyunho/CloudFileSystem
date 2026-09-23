@@ -8,12 +8,7 @@ The repository contains a fixed in-memory sample rather than a database. The ER 
 
 The web UI exposes the tree, file-specific metadata, recursive operations, tags, history state, progress, and traversal logs so a reviewer can verify behavior without browser console output.
 
-<<<<<<< HEAD
-- 支援不限層級的目錄結構，每個檔案皆屬於一個目錄，並且支援 Word、Image、Text 三種檔案類型
-- 顯示完整目錄結構與檔案資訊
-=======
 ![Cloud File System UI](docs/images/system-ui.png)
->>>>>>> 8cd6a30 (complete clouf file system requirements and bonus features)
 
 ## 2. Original Requirements
 
@@ -65,81 +60,7 @@ Angular Component -> FileSystemService -> HTTP API
 
 This is a real layered call chain, but the sample is intentionally small. Managers instantiate concrete DAOs, and the default handler constructor instantiates concrete managers. Tests inject manager interfaces; production wiring does not provide full dependency inversion for every layer.
 
-<<<<<<< HEAD
-```text
-.docx
-```
-
-搜尋結果：
-
-```text
-根目錄/專案文件/需求規格書.docx
-根目錄/個人筆記/2025 備份/舊會議記錄.docx
-```
-
-搜尋過程同樣會輸出 Traverse Log，以呈現節點的實際走訪順序。
-
-### XML Serialization
-
-可將目前完整目錄結構轉換為 XML：
-
-```xml
-<根目錄>
-  <專案文件_Project_Docs>
-    <需求規格書_docx>頁數: 15, 大小： 500KB</需求規格書_docx>
-    <系統架構圖_png>解析度: 1920x1080, 大小： 2MB</系統架構圖_png>
-  </專案文件_Project_Docs>
-  <個人筆記_Personal_Notes>
-    <Archive_2025>
-      <舊會議記錄_docx>頁數: 5, 大小： 200KB</舊會議記錄_docx>
-    </Archive_2025>
-    <待辦清單_txt>編碼: UTF-8, 大小： 1KB</待辦清單_txt>
-  </個人筆記_Personal_Notes>
-  <README_txt>編碼: ASCII, 大小： 500B</README_txt>
-</根目錄>
-```
-
-### Sorting
-
-Web UI 額外實作排序功能，可依：
-
-- 名稱
-- 大小
-- 副檔名
-
-進行升冪或降冪排序。
-
-## System Preview
-
-<p align="center">
-  <img src="docs/images/system-ui.png" width="900" alt="Cloud File System">
-</p>
-
----
-
-# 2. Domain Model
-
-檔案具有共同屬性：
-
-- Name
-- Size
-- Created Time
-- Directory
-
-因此將 `FileModel` 設計為抽象基底類別，並由不同檔案類型繼承。
-
-不同類型具有各自特有的資訊：
-
-| File Type | Specific Property |
-| --- | --- |
-| WordFile | Page Count |
-| ImageFile | Width / Height |
-| TextFile | Encoding |
-
-## UML Class Diagram
-=======
 ## 5. Domain UML
->>>>>>> 8cd6a30 (complete clouf file system requirements and bonus features)
 
 ```mermaid
 classDiagram
