@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using CloudFileSystem.Handlers;
+using CloudFileSystem.Application;
 using CloudFileSystem.Models;
 
 namespace CloudFileSystem.Controllers
@@ -8,9 +8,9 @@ namespace CloudFileSystem.Controllers
     [Route("api/[controller]/[action]")]
     public class FileSystemController : ControllerBase
     {
-        private readonly FileSystemHandler _handler;
+        private readonly IFileSystemHandler _handler;
 
-        public FileSystemController(FileSystemHandler handler) => _handler = handler;
+        public FileSystemController(IFileSystemHandler handler) => _handler = handler;
 
         [HttpGet]
         public FileSystemNode getFileTree()
@@ -19,15 +19,18 @@ namespace CloudFileSystem.Controllers
         }
 
         [HttpGet]
-        public ProcessResult<DirectorySize> calculateTotalSize([FromQuery] int directoryId)
+        public ActionResult<ProcessResult<DirectorySize>> calculateTotalSize([FromQuery] int directoryId)
         {
-            return _handler.calculateTotalSize(directoryId);
+            try { return Ok(_handler.calculateTotalSize(directoryId)); }
+            catch (KeyNotFoundException e) { return NotFound(e.Message); }
         }
 
         [HttpGet]
-        public ProcessResult<List<string>> searchByExtension([FromQuery] int directoryId, [FromQuery] string extension)
+        public ActionResult<ProcessResult<List<string>>> searchByExtension([FromQuery] int directoryId, [FromQuery] string extension)
         {
-            return _handler.searchByExtension(directoryId, extension);
+            try { return Ok(_handler.searchByExtension(directoryId, extension)); }
+            catch (KeyNotFoundException e) { return NotFound(e.Message); }
+            catch (ArgumentException e) { return BadRequest(e.Message); }
         }
 
         [HttpGet]
@@ -45,8 +48,9 @@ namespace CloudFileSystem.Controllers
         }
 
         [HttpPut]
-        public IActionResult setTags([FromQuery] NodeType nodeType, [FromQuery] int id, [FromBody] List<string> tags)
+        public IActionResult setTags([FromQuery] NodeType nodeType, [FromQuery] int id, [FromBody] List<string>? tags)
         {
+            if (tags is null) return BadRequest("Tags are required.");
             try { _handler.SetTags(nodeType, id, tags); return NoContent(); }
             catch (KeyNotFoundException e) { return NotFound(e.Message); }
             catch (ArgumentException e) { return BadRequest(e.Message); }

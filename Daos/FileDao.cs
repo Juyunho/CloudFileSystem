@@ -2,7 +2,7 @@ using CloudFileSystem.Models;
 
 namespace CloudFileSystem.Daos
 {
-    public class FileDao
+    public class FileDao : IFileDao
     {
         public List<FileModel> getAllFiles()
         {

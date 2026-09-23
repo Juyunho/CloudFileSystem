@@ -2,7 +2,7 @@ using CloudFileSystem.Models;
 
 namespace CloudFileSystem.Daos
 {
-    public class DirectoryDao
+    public class DirectoryDao : IDirectoryDao
     {
         public List<DirectoryModel> getAllDirectories()
         {

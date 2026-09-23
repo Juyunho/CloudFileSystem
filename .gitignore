@@ -19,6 +19,12 @@ dist/
 # Logs
 *.log
 
+# Test coverage
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
 # Environment
 .env
 .env.*

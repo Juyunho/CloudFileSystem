@@ -1,5 +1,17 @@
+using CloudFileSystem.Application;
+using CloudFileSystem.Application.Commands;
+using CloudFileSystem.Daos;
+using CloudFileSystem.Handlers;
+using CloudFileSystem.Managers;
+using CloudFileSystem.Managers.Impl;
+
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddSingleton<CloudFileSystem.Handlers.FileSystemHandler>();
+builder.Services.AddSingleton<IFileDao, FileDao>();
+builder.Services.AddSingleton<IDirectoryDao, DirectoryDao>();
+builder.Services.AddSingleton<IFileManager, FileManager>();
+builder.Services.AddSingleton<IDirectoryManager, DirectoryManager>();
+builder.Services.AddSingleton<FileSystemCommandHistory>();
+builder.Services.AddSingleton<IFileSystemHandler, FileSystemHandler>();
 
 // Add services to the container.
 
@@ -36,3 +48,5 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program;
